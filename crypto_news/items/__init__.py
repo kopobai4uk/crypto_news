@@ -1,1 +1,2 @@
-from .daily_coin_item import DailyCoinNews
+from .daily_coin_item import DailyCoinNewsItem
+
