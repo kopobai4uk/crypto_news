@@ -1,6 +1,8 @@
 import scrapy
+from scrapy.exceptions import CloseSpider
+
 from crypto_news.items import CoinTelegraphNews
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class CointelegraphNewsSpider(scrapy.Spider):
@@ -36,6 +38,6 @@ class CointelegraphNewsSpider(scrapy.Spider):
         news['date'] = datetime.strptime(response.css("div.post article.post__article time::attr(datetime)").get(),
                                      '%Y-%m-%d')
         news['author'] = response.css("div.post article.post__article div.post-meta__author-name::text").get()
-        #if datetime.today() - news['date'] > timedelta(5):
-            #raise scrapy.CloseSpider('')
+        if datetime.today() - news['date'] > timedelta(6):
+            raise CloseSpider('')
         yield news
