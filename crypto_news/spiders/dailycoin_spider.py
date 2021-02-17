@@ -1,8 +1,7 @@
 import scrapy
 from crypto_news.items import DailyCoinNewsItem
-import w3lib.html
-from scrapy import FormRequest
-import pdb
+from scrapy import FormRequest, exceptions
+import datetime
 
 const_form_data = {
         'next_page': str(2),
@@ -21,6 +20,7 @@ const_form_data = {
         'action': 'newshub_mikado_list_ajax',
     }
 
+
 class DailyCoinSpider(scrapy.Spider):
 
     name = 'daily_coin_spider'
@@ -34,65 +34,60 @@ class DailyCoinSpider(scrapy.Spider):
                                        self.parse_list_news_links,)
 
     def parse_list_news_links(self, response):
-
         name_of_group = response.xpath('//h5[contains(@class,'
-                                       ' "mkd-title-line-head")]/text()')\
-            .get().strip()
-        list_of_news = response.xpath(
-            '//a[@class="mkd-pt-title-link"]/@href') \
-            .getall()
+                                       '"mkd-title-line-head")]'
+                                       '/text()').get().strip()
+        list_of_news = response.xpath('//a[@class="mkd-pt-title-link"]'
+                                      '/@href').getall()
+
         yield from response.follow_all(list_of_news,
                                        self.parse_news,
                                        meta={
                                            'name_of_group': name_of_group})
+
         form_data = const_form_data.copy()
         form_data['max_pages'] = str(
-            response.xpath('//div[contains(@class,'
-                                             '"mkd-bnl-holder'
-                                             ' mkd-pl-five-holder'
-                                             '  unique-category-template-three'
-                                             ' mkd-post-columns-1'
-                                             ' mkd-post-pag-infinite")]/'
-                                             '@data-max_pages').get())
+            response.xpath('//div[contains(@class,"mkd-bnl-holder'
+                           ' mkd-pl-five-holder'
+                           '  unique-category-template-three'
+                           ' mkd-post-columns-1 mkd-post-pag-infinite")]/'
+                           '@data-max_pages').get())
         form_data['category_id'] = str(
-            response.xpath('//div[contains(@class,'
-                                               ' "mkd-bnl-holder'
-                                               ' mkd-pl-five-holder'
-                                               '  unique-category-template-three'
-                                               ' mkd-post-columns-1'
-                                               ' mkd-post-pag-infinite")]/'
-                                               '@data-category_id').get())
-
-        # pdb.set_trace()
+            response.xpath('//div[contains(@class, "mkd-bnl-holder'
+                           ' mkd-pl-five-holder'
+                           '  unique-category-template-three'
+                           ' mkd-post-columns-1 mkd-post-pag-infinite")]/'
+                           '@data-category_id').get())
 
         if int(form_data['max_pages']) > 1:
-            yield FormRequest(url=self.pagination_url, formdata=form_data,
+            yield FormRequest(url=self.pagination_url,
+                              formdata=form_data,
                               callback=self.parse_list_news_links_ajax,
                               meta={'form_data': form_data})
-            print('after')
 
     def parse_list_news_links_ajax(self, response):
         form_data = response.meta['form_data']
-        # pdb.set_trace()
-
         if int(form_data['paged']) <= int(form_data['max_pages']):
             name_of_group = response.xpath('//div[contains(@class,'
                                            '"mkd-post-info-category")]'
                                            '/a/text()').get()
-            list_of_news = response.xpath(
-                '//a[contains(@class, "mkd-pt-title-link")]/@href').getall()
+            list_of_news = response.xpath('//a[contains(@class,'
+                                          ' "mkd-pt-title-link")]'
+                                          '/@href').getall()
+
             for i in range(0, len(list_of_news)):
                 list_of_news[i] = list_of_news[i].replace('\\', '')
                 list_of_news[i] = list_of_news[i].replace('"', '')
+
             yield from response.follow_all(list_of_news,
                                            self.parse_news,
                                            meta={
                                                'name_of_group': name_of_group})
-            form_data['next_page'] = str(int(form_data['next_page']) +1)
+            form_data['next_page'] = str(int(form_data['next_page']) + 1)
             form_data['paged'] = str(int(form_data['paged']) + 1)
-            print(form_data)
 
-            yield FormRequest(url=self.pagination_url, formdata=form_data,
+            yield FormRequest(url=self.pagination_url,
+                              formdata=form_data,
                               callback=self.parse_list_news_links_ajax,
                               meta={'form_data': form_data})
 
@@ -101,7 +96,7 @@ class DailyCoinSpider(scrapy.Spider):
         news['main_url'] = self.start_urls[0]
         news['name_of_group'] = response.meta['name_of_group']
         news['title'] = response.xpath('//h1[contains(@class,'
-                                       ' "entry-title mkd-post-title")]/'
+                                       '"entry-title mkd-post-title")]/'
                                        'text()').get()
         news['text'] = response.xpath('//div[contains(@class, "wpb_wrapper")]'
                                       '//text()').getall()
@@ -116,4 +111,9 @@ class DailyCoinSpider(scrapy.Spider):
                                         '/div[contains'
                                         '(@class, "post-info-author")]/'
                                         'span/text()').get().strip()
+
+        tmp = datetime.datetime.strptime(news['date'], '%B %d, %Y').date()
+        if (datetime.datetime.now().date() - tmp).days > int(self.days):
+            raise exceptions.IgnoreRequest('all new in this date range parsed')
+
         yield news
