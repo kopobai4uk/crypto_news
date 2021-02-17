@@ -4,18 +4,10 @@ import w3lib.html
 from scrapy import FormRequest
 import pdb
 
-class DailyCoinSpider(scrapy.Spider):
-
-    name = 'daily_coin_spider'
-    start_urls = ['https://dailycoin.com/',]
-    pagination_url = 'https://dailycoin.com/wp-admin/admin-ajax.php'
-
-    page_inch = 1
-
-    formdata = {
-        'next_page': str(page_inch),
+const_formdata = {
+        'next_page': None,
         'max_pages': None,
-        'paged': str(page_inch),
+        'paged': None,
         'pagination_type': 'infinite',
         'display_pagination': 'yes',
         'excerpt_length': '24',
@@ -28,6 +20,17 @@ class DailyCoinSpider(scrapy.Spider):
         'base': 'mkd_post_layout_five',
         'action': 'newshub_mikado_list_ajax',
     }
+
+class DailyCoinSpider(scrapy.Spider):
+
+    name = 'daily_coin_spider'
+    start_urls = ['https://dailycoin.com/',]
+    pagination_url = 'https://dailycoin.com/wp-admin/admin-ajax.php'
+
+    page_inch = 2
+
+
+
     def parse(self, response, **kwargs):
         list_of_category_crypto_news = response.xpath(
             '//div[@class="mkd-menu-inner"]/ul/li/a/@href').re('.*news\/$')
@@ -35,6 +38,7 @@ class DailyCoinSpider(scrapy.Spider):
                                        self.parse_list_news_links,)
 
     def parse_list_news_links(self, response):
+
         name_of_group = response.xpath('//h5[contains(@class,'
                                        ' "mkd-title-line-head")]/text()')\
             .get().strip()
@@ -45,36 +49,47 @@ class DailyCoinSpider(scrapy.Spider):
                                        self.parse_news,
                                        meta={
                                            'name_of_group': name_of_group})
-        self.formdata['max_pages'] = \
+
+
+        formdata = const_formdata.copy()
+        print(formdata)
+
+        formdata['next_page'] = str(self.page_inch)
+        formdata['paged'] = str(self.page_inch)
+        formdata['max_pages'] = str(
             response.xpath('//div[contains(@class,'
                                              '"mkd-bnl-holder'
                                              ' mkd-pl-five-holder'
                                              '  unique-category-template-three'
                                              ' mkd-post-columns-1'
                                              ' mkd-post-pag-infinite")]/'
-                                             '@data-max_pages').get()
-        self.formdata['category_id'] = \
+                                             '@data-max_pages').get())
+        formdata['category_id'] = str(
             response.xpath('//div[contains(@class,'
                                                ' "mkd-bnl-holder'
                                                ' mkd-pl-five-holder'
                                                '  unique-category-template-three'
                                                ' mkd-post-columns-1'
                                                ' mkd-post-pag-infinite")]/'
-                                               '@data-category_id').get()
+                                               '@data-category_id').get())
+        # pdb.set_trace()
 
-        if int(self.formdata['max_pages']) > 1:
-            print(self.formdata)
-            print('befor')
-            yield FormRequest(url=self.pagination_url, formdata=self.formdata,
-                              callback=self.parse_list_news_links_ajax)
+        if int(formdata['max_pages']) > 1:
+            yield FormRequest(url=self.pagination_url, formdata=formdata,
+                              callback=self.parse_list_news_links_ajax,
+                              meta={'formdata': formdata})
             print('after')
 
     def parse_list_news_links_ajax(self, response):
+
+        formdata = response.meta['formdata']
         # pdb.set_trace()
-        print('this is fuc {}-page_inch  {}-data_max_pages'.format(self.page_inch, self.formdata['max_pages']))
+        print(formdata)
+        # print('this is fuc {}-page_inch  {}-data_max_pages'.format(
+        #     self.page_inch, self.formdata['max_pages']))
         self.page_inch += 1
 
-        if int(self.page_inch) <= int(self.formdata['max_pages']):
+        if int(self.page_inch) <= int(formdata['max_pages']):
             name_of_group = response.xpath('//div[contains(@class,'
                                            '"mkd-post-info-category")]'
                                            '/a/text()').get()
@@ -88,13 +103,14 @@ class DailyCoinSpider(scrapy.Spider):
                                            self.parse_news,
                                            meta={
                                                'name_of_group': name_of_group})
-            self.formdata['next_page'] = str(self.page_inch)
-            self.formdata['paged'] = str(self.page_inch)
-            print(self.formdata)
-            pdb.set_trace()
+            formdata['next_page'] = str(self.page_inch)
+            formdata['paged'] = str(self.page_inch)
+            print(formdata)
+            # pdb.set_trace()
 
-            yield FormRequest(url=self.pagination_url, formdata=self.formdata,
-                              callback=self.parse_list_news_links_ajax)
+            yield FormRequest(url=self.pagination_url, formdata=formdata,
+                              callback=self.parse_list_news_links_ajax,
+                              meta={'formdata':formdata})
 
     def parse_news(self, response):
         news = DailyCoinNewsItem()
