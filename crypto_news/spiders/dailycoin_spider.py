@@ -33,6 +33,14 @@ class DailyCoinSpider(scrapy.Spider):
         yield from response.follow_all(list_of_category_crypto_news,
                                        self.parse_list_news_links,)
 
+    def check_date(self, list_of_dates):
+        for date in list_of_dates:
+            clean_date = datetime.datetime.strptime(date.strip(),
+                                                    '%B %d, %Y').date()
+            if (datetime.datetime.now().date() - clean_date).days > int(
+                    self.days):
+                raise exceptions.IgnoreRequest('data incorect')
+
     def parse_list_news_links(self, response):
         name_of_group = response.xpath('//h5[contains(@class,'
                                        '"mkd-title-line-head")]'
@@ -44,11 +52,8 @@ class DailyCoinSpider(scrapy.Spider):
                                        ' "mkd-post-info-date'
                                        ' entry-date updated")]'
                                        '/span/text()').getall()
-        for date in list_of_dates:
-            clean_date = datetime.datetime.strptime(date.strip(),
-                                                    '%B %d, %Y').date()
-            if (datetime.datetime.now().date() - clean_date).days > int(self.days):
-                raise exceptions.IgnoreRequest('data incorect')
+        self.check_date(list_of_dates)
+
         yield from response.follow_all(list_of_news,
                                        self.parse_news,
                                        meta={
@@ -78,6 +83,7 @@ class DailyCoinSpider(scrapy.Spider):
         form_data = response.meta['form_data']
 
         if int(form_data['paged']) <= int(form_data['max_pages']):
+
             list_of_dates = response.xpath('//div[contains(@class,'
                                            '"mkd-post-info-date")]'
                                            '/span/text()').getall()
@@ -87,11 +93,7 @@ class DailyCoinSpider(scrapy.Spider):
                     list_of_news_clean.append(
                         ''.join(c for c in date if c not in '\\n'))
             list_of_news_clean.pop()
-            for date in list_of_news_clean:
-                clean_date = datetime.datetime.strptime(date.strip(),
-                                                        '%B %d, %Y').date()
-                if (datetime.datetime.now().date() - clean_date).days > int(self.days):
-                    raise exceptions.IgnoreRequest('data incorect')
+            self.check_date(list_of_news_clean)
 
             name_of_group = response.xpath('//div[contains(@class,'
                                            '"mkd-post-info-category")]'
