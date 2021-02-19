@@ -19,6 +19,7 @@ htmlcov/
 /tests/keys/localhost.crt
 /tests/keys/localhost.key
 quotes-cointelegraph.com.html
+cointelegraph.json
 
 # Windows
 Thumbs.db
