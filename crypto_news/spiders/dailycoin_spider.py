@@ -33,31 +33,31 @@ class DailyCoinSpider(scrapy.Spider):
         yield from response.follow_all(list_of_category_crypto_news,
                                        self.parse_list_news_links,)
 
-    def check_date(self, list_of_dates):
-        for date in list_of_dates:
-            clean_date = datetime.datetime.strptime(date.strip(),
+    def check_date(self, date_of_news):
+        try:
+            clean_date = datetime.datetime.strptime(date_of_news.strip(),
                                                     '%B %d, %Y').date()
-            if (datetime.datetime.now().date() - clean_date).days > int(
-                    self.days):
-                raise exceptions.IgnoreRequest('data incorect')
+            if (datetime.datetime.now().date() - clean_date).days > int(self.days):
+                return True
+        except:
+            return False
 
     def parse_list_news_links(self, response):
         name_of_group = response.xpath('//h5[contains(@class,'
                                        '"mkd-title-line-head")]'
                                        '/text()').get().strip()
-        list_of_news = response.xpath('//a[@class="mkd-pt-title-link"]'
-                                      '/@href').getall()
+        list_of_news_links = response.xpath('//a[@class="mkd-pt-title-link"]'
+                                            '/@href').getall()
 
         list_of_dates = response.xpath('//div[contains(@class,'
                                        ' "mkd-post-info-date'
                                        ' entry-date updated")]'
                                        '/span/text()').getall()
-        self.check_date(list_of_dates)
-
-        yield from response.follow_all(list_of_news,
-                                       self.parse_news,
-                                       meta={
-                                           'name_of_group': name_of_group})
+        for counter in range(0, len(list_of_news_links)-1):
+            if self.check_date(list_of_dates[counter]):
+                raise exceptions.IgnoreRequest('bad date')
+            yield scrapy.Request(list_of_news_links[counter], self.parse_news,
+                                 meta={'name_of_group': name_of_group})
         form_data = const_form_data.copy()
 
         form_data['max_pages'] = str(
@@ -87,29 +87,29 @@ class DailyCoinSpider(scrapy.Spider):
             list_of_dates = response.xpath('//div[contains(@class,'
                                            '"mkd-post-info-date")]'
                                            '/span/text()').getall()
-            list_of_news_clean = []
-            for date in list_of_dates:
-                if (''.join(c for c in date if c not in '\\n')).strip():
-                    list_of_news_clean.append(
-                        ''.join(c for c in date if c not in '\\n'))
-            list_of_news_clean.pop()
-            self.check_date(list_of_news_clean)
-
-            name_of_group = response.xpath('//div[contains(@class,'
-                                           '"mkd-post-info-category")]'
-                                           '/a/text()').get()
             list_of_news = response.xpath('//a[contains(@class,'
                                           ' "mkd-pt-title-link")]'
                                           '/@href').getall()
+            list_of_news_date_clean = []
+            for date in list_of_dates:
+                if (''.join(c for c in date if c not in '\\n')).strip():
+                    list_of_news_date_clean.append(
+                        ''.join(c for c in date if c not in '\\n'))
 
-            for i in range(0, len(list_of_news)):
-                list_of_news[i] = list_of_news[i].replace('\\', '')
-                list_of_news[i] = list_of_news[i].replace('"', '')
+            list_of_news_date_clean.pop()
 
-            yield from response.follow_all(list_of_news,
-                                           self.parse_news,
-                                           meta={
-                                               'name_of_group': name_of_group})
+            for counter in range(0, len(list_of_news)-1):
+                if self.check_date(list_of_news_date_clean[counter]):
+                    raise exceptions.IgnoreRequest('bad date')
+                name_of_group = response.xpath('//div[contains(@class,'
+                                               '"mkd-post-info-category")]'
+                                               '/a/text()').get()
+
+                list_of_news[counter] = list_of_news[counter].replace('\\', '')
+                list_of_news[counter] = list_of_news[counter].replace('"', '')
+
+                yield scrapy.Request(list_of_news[counter], self.parse_news,
+                                     meta={'name_of_group': name_of_group})
             form_data['next_page'] = str(int(form_data['next_page']) + 1)
             form_data['paged'] = str(int(form_data['paged']) + 1)
 
