@@ -18,11 +18,8 @@ htmlcov/
 .mypy_cache/
 /tests/keys/localhost.crt
 /tests/keys/localhost.key
-quotes-cointelegraph.com.html
-cointelegraph.json
 /crypto_news/spiders/quotes_news.py
 /crypto_news/spiders/form_request_try.py
-req.json
 
 # Windows
 Thumbs.db
