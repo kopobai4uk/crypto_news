@@ -1,0 +1,1 @@
+from .bitcoin_magazine_item import BitcoinMagazineItem
