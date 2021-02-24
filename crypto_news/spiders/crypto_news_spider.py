@@ -3,6 +3,7 @@ import lxml.html
 import datetime
 from crypto_news.items import CryptoNewsItem
 import demjson
+import pdb
 
 const_form_data = {
     "event": "articles.articles#morepages",
@@ -31,14 +32,18 @@ class CryptoNewsSpider(scrapy.Spider):
                                                   '/div[contains(@class,"props")]'
                                                   '/span[contains(@class,"notch")]'
                                                   '/i/time/@datetime').getall()
+        # pdb.set_trace()
         if response.xpath('//script/text()').re(".*_load_more.*"):
             script_function = response.xpath('//script/text()').re(".*_load_more.*")[0]
-            js_dict = demjson.decode(script_function[20:])
-            formatted_data_form_script = lxml.html.fromstring(js_dict['pages'][0])
-            links_of_news_links.extend(
-                formatted_data_form_script.xpath('//div/a/@href'))
-            list_of_date_posted_news.extend(
-                formatted_data_form_script.xpath('//time/@datetime'))
+            try:
+                js_dict = demjson.decode(script_function[20:])
+                formatted_data_form_script = lxml.html.fromstring(js_dict['pages'][0])
+                links_of_news_links.extend(
+                    formatted_data_form_script.xpath('//div/a/@href'))
+                list_of_date_posted_news.extend(
+                    formatted_data_form_script.xpath('//time/@datetime'))
+            except:
+                print("problem with parsing js functions")
 
         for counter in range(0, len(links_of_news_links)-1):
             self.data_filter(list_of_date_posted_news[counter])
