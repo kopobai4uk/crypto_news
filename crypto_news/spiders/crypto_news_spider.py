@@ -3,7 +3,7 @@ import lxml.html
 import datetime
 from crypto_news.items import CryptoNewsItem
 import demjson
-import pdb
+from scrapy.loader import ItemLoader
 
 FORM_DATA = {
     "event": "articles.articles#morepages",
@@ -16,13 +16,13 @@ FORM_DATA = {
 class CryptoNewsSpider(scrapy.Spider):
 
     name = 'crypto_news'
-    start_urls = ['https://cryptonews.com/',]
+    start_urls = ['https://cryptonews.com/', ]
 
     def parse(self, response):
         list_of_category_links = response.xpath(
             '//div[contains(@class, "cn-sub-nav")]'
             '/a/@href'
-        ).re('^\/news.*')
+        ).re(r'^\/news.*')
         yield from response.follow_all(list_of_category_links,
                                        self.parse_list_of_news
                                        )
@@ -48,7 +48,7 @@ class CryptoNewsSpider(scrapy.Spider):
                     formatted_data_form_script.xpath('//div/a/@href'))
                 list_of_date_posted_news.extend(
                     formatted_data_form_script.xpath('//time/@datetime'))
-            except IndexError:
+            except demjson.JSONDecodeError:
                 print("problem with parsing js functions")
 
         for counter in range(0, len(links_of_news_links)-1):
@@ -84,37 +84,42 @@ class CryptoNewsSpider(scrapy.Spider):
             raise scrapy.exceptions.IgnoreRequest('data incorrect')
 
     def parse_news(self, response):
-        news_item = CryptoNewsItem()
-        news_item['main_url'] = self.start_urls[0]
-        news_item['name_of_group'] = response.xpath(
-            '//div[contains(@class, "cn-tree padded")]/a/text()').getall()[-1]
-        news_item['title'] = response.xpath(
-            '//article[contains(@class,"cn-article-page")]/h1/text()').get()
-        news_item['author'] = []
+        news_item = ItemLoader(CryptoNewsItem(), response=response)
+        news_item.add_value('main_url', self.start_urls[0])
+        news_item.add_xpath('name_of_group',
+                            '//div[contains(@class, "cn-tree padded")]'
+                            '/a[last()]/text()'
+                            )
+        news_item.add_xpath('title',
+                            '//article[contains(@class,"cn-article-page")]'
+                            '/h1/text()'
+                            )
         if response.xpath(
                 '//div[contains(@class,"cn-props-panel")]'
-                '/div[contains(@class,"author")]/span/text()').get():
-            news_item['author'].append(
-                response.xpath(
-                    '//div[contains(@class,"cn-props-panel")]'
-                    '/div[contains(@class,"author")]'
-                    '/span/text()'
-                ).get())
+                '/div[contains(@class,"author")]/span/text()'
+        ).get():
+            news_item.add_xpath(
+                'authors',
+                '//div[contains(@class,"cn-props-panel")]'
+                '/div[contains(@class,"author")]/span/text()'
+            )
         else:
-            news_item['author'].append(
-                response.xpath(
-                    '//div[contains(@class,"cn-props-panel")]'
-                    '/div[contains(@class,"author")]'
-                    '/span/a/text()'
-                ).get())
-
-        news_item['date'] = response.xpath(
+            news_item.add_xpath(
+                'authors',
+                '//div[contains(@class,"cn-props-panel")]'
+                '/div[contains(@class,"author")]'
+                '/span/a/text()'
+            )
+        news_item.add_xpath(
+            'date',
             '//div[contains(@class,"cn-props-panel")]'
             '/div[contains(@class,"time")]'
             '/time/@datetime'
-        ).get()
+        )
+        news_item.add_xpath(
+            'text',
+            '//div[contains(@class,"content")]'
+            '/div[contains(@class,"cn-content")]'
+        )
 
-        news_item['text'] = response.xpath(
-            '//div[contains(@class,"cn-content")]/p/text()').getall()
-
-        yield news_item
+        yield news_item.load_item()
