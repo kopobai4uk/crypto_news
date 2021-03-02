@@ -1,9 +1,9 @@
 import scrapy
+from scrapy.loader import ItemLoader
 import re
 import datetime
 from dateutil.relativedelta import relativedelta
 from crypto_news.items import CryptoSlateItem
-
 
 class CryptoSlateSpider(scrapy.Spider):
 
@@ -59,7 +59,8 @@ class CryptoSlateSpider(scrapy.Spider):
                 '/div/article/a/@href'
             ).getall())
 
-        news_item = CryptoSlateItem()
+        news_item = ItemLoader(item=CryptoSlateItem(),
+                               response=response)
         news_item['name_of_group'] = response.xpath(
             '//div[contains(@class,"container")]'
             '/div[contains(@class,"news-feed")]'

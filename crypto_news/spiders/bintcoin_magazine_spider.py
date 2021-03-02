@@ -58,7 +58,6 @@ class BitcoinMagazineSpider(scrapy.Spider):
             '//div[contains(@class, "post-title-container")]'
             '/aside[contains(@class,"post-category post-detail-category")]'
             '/a/text()',
-            TakeFirst(),
         )
         news_item.add_xpath(
             'title',
