@@ -8,3 +8,6 @@ class CryptoSlateItem(NewsItem):
     name_of_group = scrapy.Field(
         input_processor=MapCompose(str.strip),
     )
+    authors = scrapy.Field(
+        input_processor=MapCompose(str.strip),
+    )

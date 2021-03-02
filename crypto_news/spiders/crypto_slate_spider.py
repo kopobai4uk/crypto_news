@@ -106,7 +106,8 @@ class CryptoSlateSpider(scrapy.Spider):
             '/div[contains(@class,"post")]'
             '/div[contains(@class,"title clearfix")]'
             '/div[contains(@class,"post-meta clearfix")]'
-            '/span/span[contains(@class,"post-author")]/text()'
+            '/span/span[contains(@class,"post-author")]/text()',
+            re='(.*\w+)'
         )
         news_item.add_value(
             'date',
