@@ -5,9 +5,10 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from crypto_news.items import CryptoSlateItem
 
+
 class CryptoSlateSpider(scrapy.Spider):
 
-    name = 'cryptoslate'
+    name = 'crypto_slate_spider'
     start_urls = ['https://cryptoslate.com/']
 
     def parse(self, response, **kwargs):
@@ -57,23 +58,24 @@ class CryptoSlateSpider(scrapy.Spider):
                 '/section[contains(@class,"list-feed")]'
                 '/div[contains(@class,"posts clearfix")]'
                 '/div/article/a/@href'
-            ).getall())
-
-        news_item = ItemLoader(item=CryptoSlateItem(),
-                               response=response)
-        news_item['name_of_group'] = response.xpath(
-            '//div[contains(@class,"container")]'
-            '/div[contains(@class,"news-feed")]'
-            '/div[contains(@class,"widget-title")]'
-            '/h3/text()'
-        ).re(" .* ")[0].strip()
-
+            ).getall()
+        )
         for counter in range(0, len(list_of_posts_links)-1):
             self.date_filter(
                 self.days_ago_to_date(list_of_date_posts[counter]))
+            news_item = ItemLoader(item=CryptoSlateItem(),
+                                   response=response)
+            news_item.add_xpath(
+                'name_of_group',
+                '//div[contains(@class,"container")]'
+                '/div[contains(@class,"news-feed")]'
+                '/div[contains(@class,"widget-title")]'
+                '/h3/text()',
+                re=(r" .* "),
+            )
             yield response.follow(list_of_posts_links[counter],
                                   self.parse_news,
-                                  meta={'news_item': news_item}
+                                  meta={'news_item': news_item.load_item()}
                                   )
         if response.xpath(
                 '//div[contains(@class,"site-navigation clearfix")]/a/@href'):
@@ -85,35 +87,38 @@ class CryptoSlateSpider(scrapy.Spider):
                 self.parse_list_of_links_news,)
 
     def parse_news(self, response):
-        news_item = response.meta['news_item']
-        news_item['main_url'] = self.start_urls[0]
-        news_item['name_of_subgroup'] = response.xpath(
+        news_item = ItemLoader(response.meta['news_item'], response=response)
+        news_item.add_value('main_url', self.start_urls[0])
+        news_item.add_xpath(
+            'name_of_subgroup',
             '//div[contains(@class,"title clearfix ")]'
             '/span[contains(@class, "post-category")]/span/a/text()'
-        ).get()
-        news_item['title'] = response.xpath(
+        )
+
+        news_item.add_xpath(
+            'title',
             '//div[contains(@class,"post-container")]'
             '/div[contains(@class,"post")]/@data-title'
-        ).get()
-
-        news_item['authors'] = []
-        news_item['authors'].append(
-            response.xpath(
-                '//div[contains(@class,"post-container")]'
-                '/div[contains(@class,"post")]'
-                '/div[contains(@class,"title clearfix")]'
-                '/div[contains(@class,"post-meta clearfix")]'
-                '/span/span[contains(@class,"post-author")]/text()'
+        )
+        news_item.add_xpath(
+            'authors',
+            '//div[contains(@class,"post-container")]'
+            '/div[contains(@class,"post")]'
+            '/div[contains(@class,"title clearfix")]'
+            '/div[contains(@class,"post-meta clearfix")]'
+            '/span/span[contains(@class,"post-author")]/text()'
+        )
+        news_item.add_value(
+            'date',
+            self.date_to_iso(response.xpath(
+                '(//span[contains(@class,"post-date")])[1]/text()'
             ).get())
-
-        news_item['date'] = self.date_to_iso(response.xpath(
-            '//span[contains(@class,"post-date")]/text()'
-        ).get())
-        news_item['text'] = response.xpath(
+        )
+        news_item.add_xpath(
+            'text',
             '//div[contains(@class,"post-box clearfix")]/article'
-        ).get()
-
-        yield news_item
+        )
+        yield news_item.load_item()
 
     def date_filter(self, date):
         if (datetime.datetime.now() - date).days > int(self.days):

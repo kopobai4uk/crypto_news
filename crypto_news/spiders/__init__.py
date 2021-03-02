@@ -1,5 +1,5 @@
 from .coin_desk_spider import CoinDeskSpider
-from .cryptoslate_spider import CryptoSlateSpider
+from .crypto_slate_spider import CryptoSlateSpider
 from .bintcoin_magazine_spider import BitcoinMagazineSpider
 from .dailycoin_spider import DailyCoinSpider
 from .crypto_news_spider import CryptoNewsSpider
