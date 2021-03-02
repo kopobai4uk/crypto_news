@@ -85,7 +85,6 @@ class BitcoinMagazineSpider(scrapy.Spider):
             '//div[contains(@class, "thb-post-share-container")]'
             '/div[contains(@class, "post-content-container")]'
             '//div[contains(@class, "post-content entry-content")]',
-            TakeFirst()
         )
         yield news_item.load_item()
 

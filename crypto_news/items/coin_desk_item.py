@@ -1,5 +1,6 @@
+import scrapy
 from .news_item import NewsItem
 
 
 class CoinDeskItem(NewsItem):
-    pass
+    name_of_subgroup = scrapy.Field()

@@ -42,16 +42,19 @@ class CoinDeskSpider(scrapy.Spider):
             date = post['date']
             self.data_filter(date)
 
-            news_item = ItemLoader(CoinDeskItem())
+            news_item = ItemLoader(CoinDeskItem(), response=response)
             news_item.add_value('title', post['title'])
             news_item.add_value('main_url', self.start_urls[0])
-            news_item.add_value('name_of_group', post['category']['name'])
-            news_item.add_value('author', post['authors'])
+            news_item.add_value('name_of_group', post['tag']['name'])
+            news_item.add_value(
+                'authors',
+                [author['name'] for author in post['authors']])
+            news_item.add_value('name_of_subgroup', post['category']['name'])
             news_item.add_value('date', post['date'])
             slug = post['slug']
             yield scrapy.Request(self.start_urls[0]+slug,
                                  self.parse_news,
-                                 meta={'news_item': news_item}
+                                 meta={'news_item': news_item.load_item()}
                                  )
 
         if page_response_json['next'] == 'null':
@@ -69,10 +72,10 @@ class CoinDeskSpider(scrapy.Spider):
             raise exceptions.IgnoreRequest('data incorrect')
 
     def parse_news(self, response):
-        news_item = response.meta['news_item']
+        news_item = ItemLoader(response.meta['news_item'], response=response)
         news_item.add_xpath(
             'text',
-            '//section[contains(@class, "article-body")]'
-            '/div/p/text()'
+            '(//section[contains(@class,"article-body")])[1]'
+            '/div[contains(@class,"article-pharagraph")]'
         )
         yield news_item.load_item()
