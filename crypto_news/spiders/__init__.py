@@ -1,3 +1,4 @@
+from .coindesk_spider import CoinDeskSpider
 from .cryptoslate_spider import CryptoSlateSpider
 from .bintcoin_magazine_spider import BitcoinMagazineSpider
 from .dailycoin_spider import DailyCoinSpider
