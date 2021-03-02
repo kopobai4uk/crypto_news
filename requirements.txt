@@ -1,1 +1,2 @@
 scrapy==2.4.1
+demjson==2.2.4
