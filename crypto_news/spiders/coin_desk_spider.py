@@ -1,7 +1,8 @@
 import scrapy
+from scrapy.loader import ItemLoader
+from scrapy import exceptions
 from urllib.parse import urlparse
 import json
-from scrapy import exceptions
 from crypto_news.items import CoinDeskItem
 import datetime
 
@@ -40,18 +41,17 @@ class CoinDeskSpider(scrapy.Spider):
         for post in page_response_json['posts']:
             date = post['date']
             self.data_filter(date)
-            item = CoinDeskItem()
-            item['title'] = post['title']
-            item['main_url'] = self.start_urls[0]
-            item['name_of_group'] = post['category']['name']
-            item['author'] = []
-            for author in post['authors']:
-                item['author'].append(author)
-            item['date'] = post['date']
+
+            news_item = ItemLoader(CoinDeskItem())
+            news_item.add_value('title', post['title'])
+            news_item.add_value('main_url', self.start_urls[0])
+            news_item.add_value('name_of_group', post['category']['name'])
+            news_item.add_value('author', post['authors'])
+            news_item.add_value('date', post['date'])
             slug = post['slug']
             yield scrapy.Request(self.start_urls[0]+slug,
                                  self.parse_news,
-                                 meta={'item': item}
+                                 meta={'news_item': news_item}
                                  )
 
         if page_response_json['next'] == 'null':
@@ -64,14 +64,15 @@ class CoinDeskSpider(scrapy.Spider):
         )
 
     def data_filter(self, date):
-        if (datetime.datetime.now()
-            - datetime.datetime.fromisoformat(date)).days > int(self.days):
+        if (datetime.datetime.now() - datetime.datetime.fromisoformat(date))\
+                .days > int(self.days):
             raise exceptions.IgnoreRequest('data incorrect')
 
     def parse_news(self, response):
-        item = response.meta['item']
-        item['text'] = response.xpath(
+        news_item = response.meta['news_item']
+        news_item.add_xpath(
+            'text',
             '//section[contains(@class, "article-body")]'
             '/div/p/text()'
-        ).getall()
-        yield item
+        )
+        yield news_item.load_item()
