@@ -18,7 +18,8 @@ class CryptoSlateSpider(scrapy.Spider):
             '/ul[contains(@class,"menu")]/li/a/@href'
         )
         yield from response.follow_all(list_of_category_links,
-                                       self.parse_list_of_links_news)
+                                       self.parse_list_of_links_news
+                                       )
 
     def parse_list_of_links_news(self, response):
         list_of_posts_links = response.xpath(
@@ -26,7 +27,8 @@ class CryptoSlateSpider(scrapy.Spider):
             '/div[contains(@class,"news-feed")]'
             '/div[contains(@class,"list-feed")]'
             '/div[contains(@class,"list-post clearfix")]'
-            '/article/a/@href').getall()
+            '/article/a/@href'
+        ).getall()
         list_of_date_posts = response.xpath(
             '//div[contains(@class,"container")]'
             '/div[contains(@class,"news-feed")]'
