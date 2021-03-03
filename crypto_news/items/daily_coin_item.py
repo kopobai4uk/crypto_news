@@ -1,5 +1,9 @@
 from .news_item import NewsItem
+from itemloaders.processors import MapCompose
+import scrapy
 
 
 class DailyCoinNewsItem(NewsItem):
-    pass
+    authors = scrapy.Field(
+        output_processor=MapCompose(str.strip),
+    )
