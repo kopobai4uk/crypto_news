@@ -1,4 +1,5 @@
 import scrapy
+from scrapy.loader import ItemLoader
 import demjson
 import datetime
 import lxml.html
@@ -19,7 +20,7 @@ FORM_DATA = {
 
 class NewsBtcSpider(scrapy.Spider):
 
-    name = 'newsbts_spider'
+    name = 'news_bts_spider'
     start_urls = ['https://www.newsbtc.com/']
     pagination_url = 'https://www.newsbtc.com/?ajax-request=jnews'
 
@@ -50,13 +51,11 @@ class NewsBtcSpider(scrapy.Spider):
 
         if list_of_main_post_links:
             for counter in range(0, len(list_of_main_post_links)-1):
-                clean_data_date = datetime.datetime.strptime(
-                    list_of_main_post_date[counter].strip(), '%B %d, %Y')
-                print(clean_data_date)
-                self.date_filter(clean_data_date)
+                self.date_filter(
+                    self.days_ago_to_date(list_of_main_post_date[counter])
+                )
                 yield scrapy.Request(list_of_main_post_links[counter],
                                      self.parse_news)
-                self.date_filter(clean_data_date)
 
         list_of_post_links = response.xpath(
             '//div[contains(@class,"jeg_posts jeg_load_more_flag")]'
@@ -84,7 +83,6 @@ class NewsBtcSpider(scrapy.Spider):
             ).get()
             if next_page:
                 yield scrapy.Request(next_page, self.parse_list_of_news_links)
-
         if response.xpath(
                 '//div[contains(@class,"jeg_block_navigation")]'
                 '/div[contains(@class, "jeg_block_loadmore")]'
@@ -125,9 +123,8 @@ class NewsBtcSpider(scrapy.Spider):
             '/div[contains(@class, "jeg_meta_date")]/a/text()'
         )
         for counter in range(0, len(list_of_post_links)-1):
-            clean_data_date = datetime.datetime.strptime(
-                list_of_post_dates[counter].strip(), '%B %d, %Y')
-            self.date_filter(clean_data_date)
+            self.date_filter(self.days_ago_to_date(
+                list_of_post_dates[counter]))
             yield scrapy.Request(list_of_post_links[counter],
                                  self.parse_news)
         if response.json()['next'] == 'true':
@@ -140,47 +137,60 @@ class NewsBtcSpider(scrapy.Spider):
                                      meta={'form_data': form_data}
                                      )
 
-    @staticmethod
-    def days_ago_to_date(self, date):
-        value, unit = re.search(r'(\d+) (\w+) ago', date.strip()).groups()
-        if not unit.endswith('s'):
-            unit += 's'
-        if unit == 'mins':
-            unit = 'minute'
-        delta = relativedelta(**{unit: int(value)})
-        return datetime.datetime.now() - delta
-
-    def date_filter(self, date):
-        if (datetime.datetime.now() - date).days > int(self.days):
-            raise scrapy.exceptions.IgnoreRequest('invalid date')
-
     def parse_news(self, response):
-        news_item = NewsBtcItem()
-        news_item['main_url'] = self.start_urls[0]
-        news_item['name_of_group'] = response.xpath(
-            '//div[contains(@id,"breadcrumbs")]'
+        news_item = ItemLoader(NewsBtcItem(), response=response)
+        news_item.add_value('main_url', self.start_urls[0])
+        news_item.add_xpath(
+            'name_of_group',
+            '(//div[contains(@id,"breadcrumbs")])[1]'
             '/span[contains(@class,"breadcrumb_last_link")]/a/text()'
-        ).get()
-
-        news_item['title'] = response.xpath(
+        )
+        try:
+            news_item._local_values['name_of_group']
+        except KeyError:
+            news_item.add_value('name_of_group',
+                                'Press Releases')
+        news_item.add_xpath(
+            'title',
             '//div[contains(@class,"entry-header")]'
             '/h1[contains(@class,"jeg_post_title")]/text()'
-        ).get()
-        if not news_item['name_of_group']:
-            news_item['name_of_group'] = 'Press Releases'
-        news_item['authors'] = []
-        news_item['authors'].append(response.xpath(
+        )
+        news_item.add_xpath(
+            'authors',
             '//div[contains(@class,"jeg_meta_container")]'
             '/div/div/div[contains(@class,"jeg_meta_author")]/a/text()'
-        ).get())
-        news_item['date'] = self.days_ago_to_date(response.xpath(
-            '//div[contains(@class,"jeg_meta_container")]'
-            '/div/div/div[contains(@class,"jeg_meta_date")]/a/text()'
-        ).get())
-        news_item['text'] = response.xpath(
-            '//div[contains(@class,"jeg_main_content col-md-8")]')[0]\
-            .xpath('//div[contains(@class, "entry-content")]'
-                   '/div[contains(@class,"content-inner")]/child::*'
-                   ).getall()
+        )
+        news_item.add_value(
+            'date',
+            self.days_ago_to_date(
+                response.xpath(
+                    '(//div[contains(@class,"jeg_meta_container")])[1]'
+                    '/div/div/div[contains(@class,"jeg_meta_date")]/a/text()'
+                ).get())
+        )
+        news_item.add_xpath(
+            'text',
+            '(//div[contains(@class, "entry-content")])[1]'
+            '/div[contains(@class,"content-inner")]'
+        )
+        yield news_item.load_item()
 
-        yield news_item
+    @staticmethod
+    def days_ago_to_date(date):
+        try:
+            return datetime.datetime.strptime(date.strip(),
+                                              '%B %d, %Y'
+                                              ).isoformat()
+        except ValueError:
+            value, unit = re.search(r'(\d+) (\w+) ago', date).groups()
+            if not unit.endswith('s'):
+                unit += 's'
+            if unit == 'mins':
+                unit = 'minute'
+            delta = relativedelta(**{unit: int(value)})
+            return (datetime.datetime.now() - delta).isoformat()
+
+    def date_filter(self, date):
+        if (datetime.datetime.now()
+            - datetime.datetime.fromisoformat(date)).days > int(self.days):
+            raise scrapy.exceptions.IgnoreRequest('invalid date')
